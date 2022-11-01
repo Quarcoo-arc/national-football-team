@@ -2,7 +2,7 @@
   "name": "national-football-team",
   "version": "1.0.0",
   "description": "A simple application to store information about the national football team players (The Black Stars).",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
