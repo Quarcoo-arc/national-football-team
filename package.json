@@ -2,7 +2,7 @@
   "name": "national-football-team",
   "version": "1.0.0",
   "description": "A simple application to store information about the national football team players (The Black Stars).",
-  "main": "app.js",
+  "main": "app.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -15,6 +15,8 @@
   "devDependencies": {
     "@types/express": "^4.17.14",
     "@types/node": "^18.11.8",
+    "concurrently": "^7.5.0",
+    "nodemon": "^2.0.20",
     "typescript": "^4.8.4"
   }
 }
