@@ -1,23 +1,12 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
-import { auth, requiresAuth } from "express-openid-connect";
-import bodyParser from "body-parser";
-import fetch from "cross-fetch";
+import bodyParser, { json } from "body-parser";
+import passport from "passport";
+import LocalStrategy from "passport-local";
+import crypto from "crypto";
+import db from "./db";
 
 dotenv.config();
-
-const config = {
-  authRequired: false,
-  auth0Logout: true,
-  secret: process.env.SECRET,
-  baseURL: process.env.BASE_URL,
-  clientID: process.env.CLIENT_ID,
-  issuerBaseURL: process.env.ISSUER_BASE_URL,
-  routes: {
-    login: "false",
-    postLogoutRedirect: "/post-logout",
-  },
-};
 
 const app: Express = express();
 const port = process.env.PORT;
@@ -26,72 +15,125 @@ const jsonParser = bodyParser.json();
 
 const urlencodedParser = bodyParser.urlencoded({ extended: false });
 
-// auth router attaches /login, /logout, and /callback routes to the baseURL
-app.use(auth(config));
+passport.use(
+  new LocalStrategy(function verify(
+    username: string,
+    password: string,
+    cb: Function
+  ) {
+    db.get(
+      "SELECT * FROM users WHERE username = ?",
+      [username],
+      function (err, row) {
+        if (err) {
+          return cb(err);
+        }
+        if (!row) {
+          return cb(null, false, {
+            message: "Incorrect username or password.",
+          });
+        }
 
-app.get("/", (req: Request, res: Response) => {
-  res.json(
-    req.oidc.isAuthenticated()
-      ? { message: "Express + TypeScript Server" }
-      : { message: "Not logged in" }
-  );
-});
-
-app.get("/login", (req, res) => res.oidc.login({ returnTo: "/profile" }));
-
-app.get("/post-logout", (req, res) => res.json({ message: "Bye!" }));
-
-app.get("/callback", (req, res) => {
-  res.send("Returning...");
-});
-
-app.get("/profile", requiresAuth(), (req, res) => {
-  res.json(req.oidc.user);
-});
-
-interface SignupPayload {
-  client_id: String;
-  email: String;
-  password: String;
-  connection: String;
-}
-
-type SignupRequest = Request<{}>;
-
-app.post("/signup", jsonParser, async (req: any, res) => {
-  try {
-    //TODO: Work on this further... Take needed params from req.body
-    // Place connection in .env?
-    // Delete/Uninstall node-fetch
-
-    if (!req.body.email) {
-      return res.json({ error: "Please provide your email." });
-    }
-    if (!req.body.password) {
-      return res.json({ error: "Please provide your password." });
-    }
-    const payload = {
-      email: req.body?.email,
-      password: req.body?.password,
-      connection: process.env.CONNECTION,
-      clientid: process.env.CLIENT_ID,
-    };
-
-    const result = await fetch(
-      `${process.env.ISSUER_BASE_URL}/dbconnections/signup`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        crypto.pbkdf2(
+          password,
+          row.salt,
+          310000,
+          32,
+          "sha256",
+          function (err, hashedPassword) {
+            if (err) {
+              return cb(err);
+            }
+            if (!crypto.timingSafeEqual(row.hashed_password, hashedPassword)) {
+              return cb(null, false, {
+                message: "Incorrect username or password.",
+              });
+            }
+            return cb(null, row);
+          }
+        );
       }
     );
-    const data = await result.json();
-    res.json({ data, msg: "Data Came through" });
-  } catch (error: any) {
-    res.json({ err: error.stack, msg: "Error" });
-  }
+  })
+);
+
+passport.serializeUser(function (
+  user: { id: any; username: string },
+  cb: Function
+) {
+  process.nextTick(function () {
+    cb(null, { id: user.id, username: user.username });
+  });
+});
+
+passport.deserializeUser(function (user: {}, cb: Function) {
+  process.nextTick(function () {
+    return cb(null, user);
+  });
+});
+
+app.use(passport.initialize());
+
+app.get("/", (req: Request, res: Response) => {
+  res.json({ message: "Express + TypeScript Server" });
+});
+
+app.post(
+  "/login",
+  jsonParser,
+  passport.authenticate("local", {
+    successRedirect: "/login-success",
+    failureRedirect: "/login",
+    failureMessage: true,
+  })
+);
+
+app.get("/login-success", (req, res) =>
+  res.json({ message: "Successfully logged in!" })
+);
+
+app.get("/logout", (req: any, res, next) =>
+  req.logout((err: Error) =>
+    err ? next(err) : res.json({ message: "Successfully logged out!" })
+  )
+);
+
+app.post("/signup", jsonParser, (req: any, res, next) => {
+  let salt = crypto.randomBytes(16);
+  crypto.pbkdf2(
+    req.body.password,
+    salt,
+    310000,
+    32,
+    "sha256",
+    function (err, hashedPassword) {
+      if (err) {
+        res.json({ err: err.stack, msg: "Error" });
+        return next(err);
+      }
+      db.run(
+        "INSERT INTO users (username, hashed_password, salt) VALUES (?, ?, ?)",
+        [req.body.username, hashedPassword, salt],
+        function (err: Error) {
+          if (err) {
+            res.json({ err: err.stack, msg: "Error" });
+            return next(err);
+          }
+          let user = {
+            id: this.lastID,
+            username: req.body.username,
+          };
+          req.login(user, function (err: Error) {
+            if (err) {
+              res.json({ err: err.stack, msg: "Error" });
+              return next(err);
+            }
+            res.json(user);
+          });
+        }
+      );
+    }
+  );
 });
 
 app.listen(port, () => {
