@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
-import bodyParser, { json } from "body-parser";
+import bodyParser from "body-parser";
+import mongoose, { Schema, model } from "mongoose";
 import passport from "passport";
 import session from "express-session";
 import LocalStrategy from "passport-local";
@@ -9,12 +10,27 @@ import db from "./db";
 
 dotenv.config();
 
+mongoose.connect(`mongodb://localhost:27017/${process.env.DB}`, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+const mogo_db = mongoose.connection;
+
+const playerSchema = new Schema({
+  name: String,
+  age: Number,
+  plays_abroad: Boolean,
+  club: String,
+  is_captain: Boolean,
+  jersey_number: Number,
+  position_of_play: String,
+});
+
 const app: Express = express();
 const port = process.env.PORT;
 
-const jsonParser = bodyParser.json();
-
-const urlencodedParser = bodyParser.urlencoded({ extended: false });
+app.use(bodyParser.json());
 
 passport.use(
   new LocalStrategy(function verify(
@@ -92,7 +108,6 @@ app.get("/", (req: Request, res: Response) => {
 
 app.post(
   "/login",
-  jsonParser,
   passport.authenticate("local", {
     successRedirect: "/login-success",
     failureRedirect: "/login",
@@ -104,13 +119,13 @@ app.get("/login-success", (req, res) =>
   res.json({ message: "Successfully logged in!" })
 );
 
-app.get("/logout", jsonParser, (req: any, res, next) =>
+app.get("/logout", (req: any, res, next) =>
   req.logout((err: Error) =>
     err ? next(err) : res.json({ message: "Successfully logged out!" })
   )
 );
 
-app.post("/signup", jsonParser, (req: any, res, next) => {
+app.post("/signup", (req: any, res, next) => {
   let salt = crypto.randomBytes(16);
   crypto.pbkdf2(
     req.body.password,
