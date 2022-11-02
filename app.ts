@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import bodyParser, { json } from "body-parser";
 import passport from "passport";
+import session from "express-session";
 import LocalStrategy from "passport-local";
 import crypto from "crypto";
 import db from "./db";
@@ -74,6 +75,17 @@ passport.deserializeUser(function (user: {}, cb: Function) {
 
 app.use(passport.initialize());
 
+app.use(
+  session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: true },
+  })
+);
+
+app.use(passport.authenticate("session"));
+
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Express + TypeScript Server" });
 });
@@ -92,7 +104,7 @@ app.get("/login-success", (req, res) =>
   res.json({ message: "Successfully logged in!" })
 );
 
-app.get("/logout", (req: any, res, next) =>
+app.get("/logout", jsonParser, (req: any, res, next) =>
   req.logout((err: Error) =>
     err ? next(err) : res.json({ message: "Successfully logged out!" })
   )
