@@ -28,12 +28,12 @@ const mogo_db = mongoose.connection;
 
 const playerSchema = new Schema({
   name: String,
-  age: Number,
+  age: { type: Number, min: 14, max: 45 },
   plays_abroad: Boolean,
   club: String,
   is_captain: Boolean,
-  jersey_number: Number,
-  position_of_play: String,
+  jersey_number: { type: Number, min: 1, max: 99 },
+  position_of_play: { type: Number, min: 1, max: 11 },
 });
 
 const Player = model("Player", playerSchema);
@@ -138,6 +138,56 @@ app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
     res.send({
       success: false,
       error: error.stack,
+    });
+  }
+});
+
+app.post("/players", (req, res) => {
+  try {
+    if (
+      !req.body.name ||
+      !req.body.age ||
+      !req.body.jersey_number ||
+      !req.body.position_of_play
+    ) {
+      res.status(400);
+      return res.json({
+        success: false,
+        error: "Request is missing required fields!",
+      });
+    }
+
+    const player = new Player({
+      _id: new mongoose.Types.ObjectId(),
+      name: req.body.name,
+      age: req.body.age,
+      plays_abroad: req.body.plays_abroad || false,
+      club: req.body.club,
+      is_captain: req.body.is_captain || false,
+      jersey_number: req.body.jersey_number,
+      position_of_play: req.body.position_of_play,
+    });
+
+    player.save((err) => {
+      if (err) {
+        res.status(500);
+        return res.send({
+          success: false,
+          error: err,
+        });
+      }
+      res.status(200);
+      return res.send({
+        success: true,
+        message: "Player created successfully",
+        player,
+      });
+    });
+  } catch (error: any) {
+    res.status(404);
+    res.send({
+      success: false,
+      error: error,
     });
   }
 });
