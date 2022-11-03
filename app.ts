@@ -27,13 +27,13 @@ mongoose.connect(`mongodb://localhost:27017/ghana_black_stars`, {
 const mogo_db = mongoose.connection;
 
 const playerSchema = new Schema({
-  name: String,
-  age: { type: Number, min: 14, max: 45 },
-  plays_abroad: Boolean,
-  club: String,
-  is_captain: Boolean,
-  jersey_number: { type: Number, min: 1, max: 99 },
-  position_of_play: { type: Number, min: 1, max: 11 },
+  name: { type: String, required: true },
+  age: { type: Number, min: 14, max: 45, required: true },
+  plays_abroad: { type: Boolean, default: false },
+  club: { type: String, default: undefined },
+  is_captain: { type: Boolean, default: false },
+  jersey_number: { type: Number, min: 1, max: 99, required: true },
+  position_of_play: { type: Number, min: 1, max: 11, required: true },
 });
 
 const Player = model("Player", playerSchema);
@@ -121,13 +121,13 @@ app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
   try {
     Player.find({}, (err: Error, players: Array<String>) => {
       if (err) {
-        return res.send({
+        return res.json({
           success: false,
           error: err,
         });
       }
       const num_of_players = players.length;
-      res.send({
+      res.json({
         succes: true,
         num_of_players,
         players,
@@ -135,14 +135,14 @@ app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(404);
-    res.send({
+    res.json({
       success: false,
       error: error.stack,
     });
   }
 });
 
-app.post("/players", (req, res) => {
+app.post("/players", ensureLoggedIn, (req, res) => {
   try {
     if (
       !req.body.name ||
@@ -171,13 +171,13 @@ app.post("/players", (req, res) => {
     player.save((err) => {
       if (err) {
         res.status(500);
-        return res.send({
+        return res.json({
           success: false,
           error: err,
         });
       }
       res.status(200);
-      return res.send({
+      return res.json({
         success: true,
         message: "Player created successfully",
         player,
@@ -185,9 +185,54 @@ app.post("/players", (req, res) => {
     });
   } catch (error: any) {
     res.status(404);
-    res.send({
+    res.json({
       success: false,
       error: error,
+    });
+  }
+});
+
+app.patch("/players/:id", ensureLoggedIn, (req, res) => {
+  try {
+    if (!req.params.id) {
+      res.status(400);
+      res.json({
+        success: false,
+        error: '"id" parameter absent!',
+      });
+    }
+
+    if (!req.body) {
+      res.status(400);
+      res.json({
+        success: false,
+        error: "Request body absent!",
+      });
+    }
+
+    Player.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { returnDocument: "after" },
+      (err: Error, doc: any) => {
+        if (err) {
+          res.status(400);
+          return res.json({
+            success: false,
+            error: err,
+          });
+        }
+        return res.json({
+          success: true,
+          player: doc,
+        });
+      }
+    );
+  } catch (error) {
+    res.status(404);
+    res.json({
+      success: false,
+      error,
     });
   }
 });
