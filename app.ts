@@ -1,13 +1,13 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
-import mongoose, { Schema, model } from "mongoose";
-import createError from "http-errors";
-import passport from "passport";
-import session from "express-session";
-import connect_ensure_login from "connect-ensure-login";
-import connect_sqlite3 from "connect-sqlite3";
-import LocalStrategy from "passport-local";
+import mongoose, { Schema, model, Mongoose } from "mongoose";
+const createError = require("http-errors");
+const passport = require("passport");
+const session = require("express-session");
+const connect_ensure_login = require("connect-ensure-login");
+const connect_sqlite3 = require("connect-sqlite3");
+const LocalStrategy = require("passport-local");
 import crypto from "crypto";
 import db from "./db";
 
@@ -19,10 +19,7 @@ const ensureLoggedIn = ensureLogIn();
 
 dotenv.config();
 
-mongoose.connect(`mongodb://localhost:27017/ghana_black_stars`, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(`mongodb://localhost:27017/ghana_black_stars`);
 
 const mogo_db = mongoose.connection;
 
@@ -192,7 +189,7 @@ app.post("/players", ensureLoggedIn, (req, res) => {
   }
 });
 
-app.patch("/players/:id", ensureLoggedIn, (req, res) => {
+app.patch("/players/:id", ensureLoggedIn, async (req, res) => {
   try {
     if (!req.params.id) {
       res.status(400);
@@ -210,24 +207,27 @@ app.patch("/players/:id", ensureLoggedIn, (req, res) => {
       });
     }
 
-    Player.findByIdAndUpdate(
-      req.params.id,
+    const result: any = await Player.findOneAndUpdate(
+      {
+        _id: req.params.id,
+      },
       req.body,
-      { returnDocument: "after" },
-      (err: Error, doc: any) => {
-        if (err) {
-          res.status(400);
-          return res.json({
-            success: false,
-            error: err,
-          });
-        }
-        return res.json({
-          success: true,
-          player: doc,
-        });
-      }
+      { new: true }
     );
+
+    if (result) {
+      res.status(200);
+      return res.json({
+        success: true,
+        player: result,
+      });
+    }
+
+    res.status(404);
+    return res.json({
+      success: false,
+      error: "Failed to update player info",
+    });
   } catch (error) {
     res.status(404);
     res.json({
