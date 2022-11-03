@@ -114,7 +114,7 @@ passport.deserializeUser(function (user: {}, cb: Function) {
 });
 
 app.get("/", (req: Request, res: Response) => {
-  res.json({ message: "Express + TypeScript Server" });
+  res.json({ message: "NodeJS + Express Server" });
 });
 
 app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
@@ -228,6 +228,38 @@ app.patch("/players/:id", ensureLoggedIn, (req, res) => {
         });
       }
     );
+  } catch (error) {
+    res.status(404);
+    res.json({
+      success: false,
+      error,
+    });
+  }
+});
+
+app.delete("/players/:id", (req, res) => {
+  try {
+    if (!req.params.id) {
+      res.status(400);
+      res.json({
+        success: false,
+        error: '"id" parameter absent!',
+      });
+    }
+
+    Player.findByIdAndDelete(req.params.id, (err: Error, doc: any) => {
+      if (err) {
+        res.status(400);
+        return res.json({
+          success: false,
+          error: err,
+        });
+      }
+      return res.json({
+        success: true,
+        deleted_player: doc,
+      });
+    });
   } catch (error) {
     res.status(404);
     res.json({
