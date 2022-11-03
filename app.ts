@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import mongoose, { Schema, model } from "mongoose";
+import createError from "http-errors";
 import passport from "passport";
 import session from "express-session";
 import connect_ensure_login from "connect-ensure-login";
@@ -133,6 +134,7 @@ app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
       });
     });
   } catch (error: any) {
+    res.status(404);
     res.send({
       success: false,
       error: error.stack,
@@ -144,9 +146,13 @@ app.post(
   "/login",
   passport.authenticate("local", {
     successRedirect: "/login-success",
-    failureRedirect: "/login",
+    failureRedirect: "/login-failure",
     failureMessage: true,
   })
+);
+
+app.get("/login-failure", (req, res) =>
+  res.json({ succcess: false, error: { message: "Login failed!" } })
 );
 
 app.get("/login-success", (req, res) =>
@@ -155,7 +161,10 @@ app.get("/login-success", (req, res) =>
 
 app.get("/logout", (req: any, res, next) =>
   req.logout((err: Error) =>
-    err ? next(err) : res.json({ message: "Successfully logged out!" })
+    err
+      ? res.status(400) &&
+        res.json({ error: err, message: "Something went wrong!" })
+      : res.json({ message: "Successfully logged out!" })
   )
 );
 
@@ -169,16 +178,16 @@ app.post("/signup", (req: any, res, next) => {
     "sha256",
     function (err, hashedPassword) {
       if (err) {
-        res.json({ err: err.stack, msg: "Error" });
-        return next(err);
+        res.status(400);
+        return res.json({ success: false, error: err });
       }
       db.run(
         "INSERT INTO users (username, hashed_password, salt) VALUES (?, ?, ?)",
         [req.body.username, hashedPassword, salt],
         function (err: Error) {
           if (err) {
-            res.json({ err: err.stack, msg: "Error" });
-            return next(err);
+            res.status(400);
+            return res.json({ success: false, error: err });
           }
           let user = {
             id: this.lastID,
@@ -186,8 +195,8 @@ app.post("/signup", (req: any, res, next) => {
           };
           req.login(user, function (err: Error) {
             if (err) {
-              res.json({ err: err.stack, msg: "Error" });
-              return next(err);
+              res.status(400);
+              return res.json({ success: false, error: err });
             }
             res.json(user);
           });
@@ -195,6 +204,15 @@ app.post("/signup", (req: any, res, next) => {
       );
     }
   );
+});
+
+app.use((req, res, next) => next(createError(401)));
+
+app.use((err: any, req: Request, res: Response, next: any) => {
+  res.locals.message = err.message;
+  res.locals.error = err;
+  res.status(err.status || 500);
+  res.json({ success: false, error: err });
 });
 
 app.listen(port, () => {
