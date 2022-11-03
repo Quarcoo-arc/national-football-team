@@ -4,13 +4,21 @@ import bodyParser from "body-parser";
 import mongoose, { Schema, model } from "mongoose";
 import passport from "passport";
 import session from "express-session";
+import connect_ensure_login from "connect-ensure-login";
+import connect_sqlite3 from "connect-sqlite3";
 import LocalStrategy from "passport-local";
 import crypto from "crypto";
 import db from "./db";
 
+const SQLiteStore = connect_sqlite3(session);
+
+const ensureLogIn = connect_ensure_login.ensureLoggedIn;
+
+const ensureLoggedIn = ensureLogIn();
+
 dotenv.config();
 
-mongoose.connect(`mongodb://localhost:27017/${process.env.DB}`, {
+mongoose.connect(`mongodb://localhost:27017/ghana_black_stars`, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -26,6 +34,8 @@ const playerSchema = new Schema({
   jersey_number: Number,
   position_of_play: String,
 });
+
+const Player = model("Player", playerSchema);
 
 const app: Express = express();
 const port = process.env.PORT;
@@ -74,6 +84,19 @@ passport.use(
   })
 );
 
+app.use(passport.initialize());
+
+app.use(
+  session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: new SQLiteStore({ db: "sessions.db", dir: "./var/db" }),
+  })
+);
+
+app.use(passport.authenticate("session"));
+
 passport.serializeUser(function (
   user: { id: any; username: string },
   cb: Function
@@ -89,21 +112,32 @@ passport.deserializeUser(function (user: {}, cb: Function) {
   });
 });
 
-app.use(passport.initialize());
-
-app.use(
-  session({
-    secret: process.env.SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: true },
-  })
-);
-
-app.use(passport.authenticate("session"));
-
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Express + TypeScript Server" });
+});
+
+app.get("/players", ensureLoggedIn, (req: Request, res: Response) => {
+  try {
+    Player.find({}, (err: Error, players: Array<String>) => {
+      if (err) {
+        return res.send({
+          success: false,
+          error: err,
+        });
+      }
+      const num_of_players = players.length;
+      res.send({
+        succes: true,
+        num_of_players,
+        players,
+      });
+    });
+  } catch (error: any) {
+    res.send({
+      success: false,
+      error: error.stack,
+    });
+  }
 });
 
 app.post(
