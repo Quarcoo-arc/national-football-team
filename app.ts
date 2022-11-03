@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
-import mongoose, { Schema, model, Mongoose } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 const createError = require("http-errors");
 const passport = require("passport");
 const session = require("express-session");
@@ -176,7 +176,7 @@ app.post("/players", ensureLoggedIn, (req, res) => {
       res.status(200);
       return res.json({
         success: true,
-        message: "Player created successfully",
+        message: "Player added successfully",
         player,
       });
     });
@@ -283,7 +283,7 @@ app.get("/login-failure", (req, res) =>
 );
 
 app.get("/login-success", (req, res) =>
-  res.json({ message: "Successfully logged in!" })
+  res.json({ success: true, message: "Successfully logged in!" })
 );
 
 app.get("/logout", (req: any, res, next) =>
@@ -291,7 +291,7 @@ app.get("/logout", (req: any, res, next) =>
     err
       ? res.status(400) &&
         res.json({ error: err, message: "Something went wrong!" })
-      : res.json({ message: "Successfully logged out!" })
+      : res.json({ success: true, message: "Successfully logged out!" })
   )
 );
 
@@ -311,7 +311,7 @@ app.post("/signup", (req: any, res, next) => {
       db.run(
         "INSERT INTO users (username, hashed_password, salt) VALUES (?, ?, ?)",
         [req.body.username, hashedPassword, salt],
-        function (err: Error) {
+        function (this: any, err: Error) {
           if (err) {
             res.status(400);
             return res.json({ success: false, error: err });
@@ -325,7 +325,11 @@ app.post("/signup", (req: any, res, next) => {
               res.status(400);
               return res.json({ success: false, error: err });
             }
-            res.json(user);
+            res.json({
+              success: true,
+              message: "Successfully signed up",
+              user,
+            });
           });
         }
       );
