@@ -25,6 +25,8 @@ SECRET="Secret text"
 `PORT` indicates the port number the express server should run on.
 `SECRET` is used by _Passport_ during to establish sessions during authentication.
 
+You also need to create a _mongodb_ database called **ghana_black_stars** on your computer in order to be able to fully utilize this project.
+
 ### Available Scripts
 
 In the project directory, you can run:
